@@ -1,33 +1,65 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kristux/gophercon/pkg/routing"
 	"github.com/kristux/gophercon/pkg/webserver"
 	"github.com/kristux/gophercon/version"
 )
 
-// go run .cmd/gophercon/gophercon
+// go run ./cmd/gophercon/gophercon.go
+// curl -i http://127.0.0.1:8000/home
 func main() {
 	log.Printf(
-		"Service is starting, version is %s, time is %s...",
-		version.Release, version.BuildTime)
-	port := os.Getenv("SERVICE_PORT")
+		"Service is starting, version is %s, commit is %s, time is %s...",
+		version.Release, version.Commit, version.BuildTime,
+	)
+
+	shutdown := make(chan error, 2)
+
+	// you can also use github.com/kelseyhightower/envconfig
+	// to keep your config more structured
+	port := os.Getenv("PORT")
 	if len(port) == 0 {
-		log.Fatal("Service port was not set")
+		log.Fatal("Service port wasn't set")
 	}
+
 	r := routing.BaseRouter()
 	ws := webserver.New("", port, r)
-	log.Fatal(ws.Start())
-}
+	go func() {
+		err := ws.Start()
+		shutdown <- err
+	}()
 
-func homeHandler() func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Request is processing: %s", r.URL.Path)
-		fmt.Fprint(w, "Hello! Your request was processed.")
+	internalPort := os.Getenv("INTERNAL_PORT")
+	if len(internalPort) == 0 {
+		log.Fatal("Internal port wasn't set")
 	}
+	diagnosticsRouter := routing.DiagnosticsRouter()
+	diagnosticsServer := webserver.New(
+		"", internalPort, diagnosticsRouter,
+	)
+	go func() {
+		err := diagnosticsServer.Start()
+		shutdown <- err
+	}()
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case killSignal := <-interrupt:
+		log.Printf("Got %s. Stopping...", killSignal)
+	case err := <-shutdown:
+		log.Printf("Got an error '%s'. Stopping...", err)
+	}
+
+	log.Print(ws.Stop())
+	log.Print(diagnosticsServer.Stop())
+
+	// stop extra tasks ...
 }

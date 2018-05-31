@@ -1,7 +1,7 @@
 PROJECT?=github.com/kristux/gophercon
 APP?=gophercon
 PORT?=8000
-
+INTERNAL_PORT?=8080 
 RELEASE?=0.0.1
 COMMIT?=$(shell git rev-parse --short HEAD)
 BUILD_TIME?=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
@@ -22,7 +22,7 @@ build: clean
 		-o ./bin/${APP} ${PROJECT}/cmd/gophercon 
 
 run: build
-	SERVICE_PORT=${PORT} ./bin/${APP}
+	PORT=${PORT} INTERNAL_PORT=${INTERNAL_PORT} ./bin/${APP}
 
 test:
 	go test -race ./...
