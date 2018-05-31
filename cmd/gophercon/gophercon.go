@@ -8,11 +8,14 @@ import (
 
 	"github.com/kristux/gophercon/pkg/routing"
 	"github.com/kristux/gophercon/pkg/webserver"
+	"github.com/kristux/gophercon/version"
 )
 
 // go run .cmd/gophercon/gophercon
 func main() {
-	log.Printf("Service is starting...")
+	log.Printf(
+		"Service is starting, version is %s, time is %s...",
+		version.Release, version.BuildTime)
 	port := os.Getenv("SERVICE_PORT")
 	if len(port) == 0 {
 		log.Fatal("Service port was not set")
